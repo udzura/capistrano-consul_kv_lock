@@ -4,10 +4,24 @@ require 'base64'
 require 'consul/client'
 
 namespace :consul_kv_lock do
+  class SSHKittyLogger
+    def initialize
+      @coordinator = SSHKit::Coordinator.new('localhost')
+    end
+
+    %w(debug info warn error fatal).each do |ll|
+      define_method(ll) do |str|
+        @coordinator.each do
+          run_locally { self.send(ll, "[consul-client] #{str}") }
+        end
+      end
+    end
+  end
+
   def client
     @_client ||= begin
                    consul = URI.parse(fetch(:consul_url))
-                   Consul::Client.v1.http(host: consul.host, port: consul.port, logger: Logger.new(STDOUT))
+                   Consul::Client.v1.http(host: consul.host, port: consul.port, logger: SSHKittyLogger.new)
                  end
   end
 
@@ -17,15 +31,14 @@ namespace :consul_kv_lock do
 
   def locked?
     r = client.get("/kv/#{lock_key}")
-    !! Base64.decode64(r[0]['Value']) =~ /\A(t(rue)?|1|y(es)?)\z/
-  end
-
-  def lock
-    client.put("/kv/#{lock_key}", "true")
-  end
-
-  def unlock
-    client.put("/kv/#{lock_key}", "false")
+    !!(Base64.decode64(r[0]['Value']) =~ /\A["'](t(rue)?|1|y(es)?)["']\z/)
+  rescue Consul::Client::ResponseException => e
+    # in case of 404
+    if e.message.include?('404')
+      return false
+    else
+      raise e
+    end
   end
 
   task :check_lock do
@@ -35,11 +48,17 @@ namespace :consul_kv_lock do
   end
 
   task :lock do
-    lock
+    run_locally do
+      info("Setting lock to #{fetch(:consul_url)}")
+      client.put("/kv/#{lock_key}", "true")
+    end
   end
 
   task :unlock do
-    unlock
+    run_locally do
+      info("Deleting lock from #{fetch(:consul_url)}")
+      client.put("/kv/#{lock_key}", "false")
+    end
   end
 end
 
