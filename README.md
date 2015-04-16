@@ -1,6 +1,6 @@
 # Capistrano::ConsulKvLock
 
-TODO: Write a gem description
+Introduces deployment lock using consul KVS
 
 ## Installation
 
