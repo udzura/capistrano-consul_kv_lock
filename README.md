@@ -2,6 +2,12 @@
 
 Introduces deployment lock using consul KVS
 
+## Detail
+
+Using this plugin, capistrano just puts consul KVS a lock value,
+then the deployment is prohibitted in another host
+for the lock value is released.
+
 ## Installation
 
 Add this line to your application's Gemfile:
@@ -18,9 +24,31 @@ Or install it yourself as:
 
     $ gem install capistrano-consul_kv_lock
 
+Activate in `Capfile`:
+
+```ruby
+require 'capistrano/consul_kv_lock'
+```
+
 ## Usage
 
-TODO: Write usage instructions here
+### Settings
+
+```ruby
+# Consul API URL that the operator uses as KVS.
+set :consul_url,      -> { 'http://localhost:8500' }
+
+# A key name for locking deploy.
+set :consul_lock_key, -> { 'deployment/locked' }
+```
+
+### Force unlock
+
+Delete the KVS lock value.
+
+```
+$ curl -X DELETE ${your_consul_host}:8500/v1/kv/deployment/locked
+```
 
 ## Contributing
 
