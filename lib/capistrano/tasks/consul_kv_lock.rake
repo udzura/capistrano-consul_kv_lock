@@ -65,6 +65,7 @@ end
 before 'deploy:starting', 'consul_kv_lock:lock'
 before 'consul_kv_lock:lock', 'consul_kv_lock:check_lock'
 after  'deploy:finished', 'consul_kv_lock:unlock'
+after  'deploy:failed', 'consul_kv_lock:unlock'
 
 namespace :load do
   task :defaults do
