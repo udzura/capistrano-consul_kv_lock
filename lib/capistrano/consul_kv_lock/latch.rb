@@ -16,23 +16,31 @@ module Capistrano
 
     class Latch
       def self.set_instance(consul_url, options={})
-        @_instance ||= p(new(consul_url, options))
+        @_instance ||= new(consul_url, options)
+        logger.debug "Registered latch instance: #{@_instance.inspect}"
       end
 
       def self.instance
         @_instance
       end
 
+      def self.logger
+        @_logger ||= SSHKittyLogger.new
+      end
+
       def initialize(consul_url, options={})
-        @logger = SSHKittyLogger.new
         @client = begin
                    consul = URI.parse(consul_url)
-                   Consul::Client.v1.http(host: consul.host, port: consul.port, logger: @logger)
+                   Consul::Client.v1.http(host: consul.host, port: consul.port, logger: logger)
                   end
         @lock_key = options[:consul_lock_key] || 'deployment/locked'
         @session_id = nil
       end
       attr_reader :client, :lock_key
+
+      def logger
+        self.class.logger
+      end
 
       def session_request
         {
@@ -54,7 +62,7 @@ module Capistrano
       end
 
       def create_session
-        @logger.debug "Session request: #{session_request.inspect}"
+        logger.debug "Session request: #{session_request.inspect}"
         r = client.put("/session/create", session_request)
         @session_id = r['ID']
       end
