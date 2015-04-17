@@ -18,6 +18,7 @@ module Capistrano
       def self.set_instance(consul_url, options={})
         @_instance ||= new(consul_url, options)
         logger.debug "Registered latch instance: #{@_instance.inspect}"
+        @_instance
       end
 
       def self.instance
