@@ -4,68 +4,51 @@ require 'base64'
 require 'consul/client'
 
 namespace :consul_kv_lock do
-  class SSHKittyLogger
-    def initialize
-      @coordinator = SSHKit::Coordinator.new('localhost')
-    end
-
-    %w(debug info warn error fatal).each do |ll|
-      define_method(ll) do |str|
-        @coordinator.each do
-          run_locally { self.send(ll, "[consul-client] #{str}") }
-        end
-      end
-    end
-  end
-
-  def client
-    @_client ||= begin
-                   consul = URI.parse(fetch(:consul_url))
-                   Consul::Client.v1.http(host: consul.host, port: consul.port, logger: SSHKittyLogger.new)
-                 end
-  end
-
-  def lock_key
-    fetch(:consul_lock_key)
-  end
-
-  def locked?
-    r = client.get("/kv/#{lock_key}")
-    !!(Base64.decode64(r[0]['Value']) =~ /\A["'](t(rue)?|1|y(es)?)["']\z/)
-  rescue Consul::Client::ResponseException => e
-    # in case of 404
-    if e.message.include?('404')
-      return false
-    else
-      raise e
-    end
+  def latch
+    Capistrano::ConsulKvLock::Latch.instance || \
+      Capistrano::ConsulKvLock::Latch.set_instance(fetch(:consul_url), consul_lock_key: fetch(:consul_lock_key))
   end
 
   task :check_lock do
-    if locked?
+    if latch.locked?
       fail("Deployment is locked!")
     end
+  end
+
+  task :start_session do
+    latch.create_session
+  end
+
+  task :destroy_session do
+    latch.delete_session
   end
 
   task :lock do
     run_locally do
       info("Setting lock to #{fetch(:consul_url)}")
-      client.put("/kv/#{lock_key}", "true")
+      unless latch.lock
+        warn("Setting lock to #{fetch(:consul_url)} failed! Skipping.")
+      end
     end
   end
 
   task :unlock do
     run_locally do
       info("Deleting lock from #{fetch(:consul_url)}")
-      client.put("/kv/#{lock_key}", "false")
+      unless latch.unlock
+        warn("Deleting lock from #{fetch(:consul_url)} failed! Skipping.")
+      end
     end
   end
 end
 
 before 'deploy:starting', 'consul_kv_lock:lock'
-before 'consul_kv_lock:lock', 'consul_kv_lock:check_lock'
+before 'consul_kv_lock:lock', 'consul_kv_lock:start_session'
+before 'consul_kv_lock:start_session', 'consul_kv_lock:check_lock'
+
 after  'deploy:finished', 'consul_kv_lock:unlock'
 after  'deploy:failed', 'consul_kv_lock:unlock'
+after  'consul_kv_lock:unlock', 'consul_kv_lock:destroy_session'
 
 namespace :load do
   task :defaults do
