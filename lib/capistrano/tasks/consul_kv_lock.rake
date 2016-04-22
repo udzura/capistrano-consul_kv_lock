@@ -1,8 +1,3 @@
-require 'uri'
-require 'base64'
-
-require 'consul/client'
-
 namespace :consul_kv_lock do
   def latch
     Capistrano::ConsulKvLock::Latch.instance || \

@@ -1,3 +1,5 @@
+require 'diplomat'
+
 module Capistrano
   module ConsulKvLock
     class SSHKittyLogger
