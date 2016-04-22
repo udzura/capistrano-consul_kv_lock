@@ -71,7 +71,7 @@ module Capistrano
       end
 
       def lock
-        with_session { Diplomat::Lock.acquire(lock_key, @session_id) }
+        with_session { Diplomat::Lock.acquire(lock_key, @session_id, "true") }
       end
 
       def unlock
