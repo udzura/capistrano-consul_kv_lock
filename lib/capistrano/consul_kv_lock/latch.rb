@@ -34,7 +34,7 @@ module Capistrano
         @lock_key = options[:consul_lock_key] || 'deployment/locked'
         @session_id = nil
       end
-      attr_reader :client, :lock_key
+      attr_reader :lock_key
 
       def logger
         self.class.logger
