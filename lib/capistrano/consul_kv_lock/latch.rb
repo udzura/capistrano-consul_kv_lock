@@ -50,7 +50,7 @@ module Capistrano
       end
 
       def locked?
-        !!(Diplomat::Kv.get(lock_key) =~ /\A["'](t(rue)?|1|y(es)?)["']\z/)
+        !!(Diplomat::Kv.get(lock_key) =~ /\A(t(rue)?|1|y(es)?)\z/)
       rescue => e
         # in case of 404
         if e.message.include?('404')
